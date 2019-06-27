@@ -14,7 +14,27 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sync"
 )
+
+var memoryOnce sync.Once
+
+type BinDatabase interface {
+	Read(bin uint32) (mod.BinData, error)
+	Save(bin uint32, binData mod.BinData) error
+}
+
+type memoryDatabase struct {
+
+}
+
+func (m *memory)Read(bin uint32) (mod.BinData, error)  {
+	return mod.BinData{}, nil
+}
+
+func (m *memory)Save(bin uint32, bindata mod.BinData) error  {
+	return nil
+}
 
 var (
 	bankNameCnFileName         = "bank_name_cn.csv"
