@@ -11,6 +11,12 @@ type ResponseData struct {
 }
 
 const (
+	//成功
 	ResponseCodeSuccess = 1001
+	//失败
 	ResponseCodeFailure = 1002
+	//缺少参数
+	ResponseCodeMissingParams = 1003
+	//非法参数
+	ResponseCodeInvalidParams = 1004
 )

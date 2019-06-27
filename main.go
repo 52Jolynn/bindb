@@ -34,7 +34,7 @@ func main() {
 
 	port := flag.Int("p", 8080, "-p 8080")
 	mode := flag.String("m", "dev", "-m [dev|test|release]")
-	dataDir := flag.String("d", "", "-d /home/testuser/bindata")
+	dataDir := flag.String("d", "./test", "-d /home/testuser/bindata")
 	flag.Parse()
 
 	if *dataDir != "" {
