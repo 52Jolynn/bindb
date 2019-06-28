@@ -7,7 +7,6 @@ import (
 	"git.thinkinpower.net/bindb/file"
 	"git.thinkinpower.net/bindb/mod"
 	logger "github.com/sirupsen/logrus"
-	"io/ioutil"
 	"os"
 	"path"
 	"runtime/debug"
@@ -239,7 +238,20 @@ func write2File(bin uint32, filepath string, bindata mod.BinData) error {
 		bindata.BankPhone,
 		bindata.BankCity}, ","))
 
-	if err := ioutil.WriteFile(filepath, data.Bytes(), os.ModeAppend); err != nil {
+	var (
+		file *os.File
+		err  error
+	)
+
+	if file, err = os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err != nil {
+		return err
+	}
+
+	defer func() {
+		file.Close()
+	}()
+
+	if _, err = file.WriteString(data.String()); err != nil {
 		logger.Error(err.Error())
 		return errors.New("保存bindata失败")
 	}

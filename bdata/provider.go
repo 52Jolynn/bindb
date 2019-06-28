@@ -9,7 +9,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	logger "github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"runtime/debug"
@@ -27,8 +26,8 @@ var (
 var (
 	config                 = BinDataConfig{}
 	currentBinDatabase     BinDatabase
-	bankNameCnMapping      = mappingFile{bytes: 0, reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 3000)}
-	countryCnMapping       = mappingFile{bytes: 0, reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 300)}
+	bankNameCnMapping      = mappingFile{reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 3000)}
+	countryCnMapping       = mappingFile{reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 300)}
 	NullBinData            mod.BinData
 	setBinDatabaseModeOnce sync.Once
 )
@@ -42,7 +41,6 @@ type BinDataConfig struct {
 }
 
 type mappingFile struct {
-	bytes     int64
 	reloading chan file.FileEvent
 	dataMap   map[string]string
 }
@@ -81,11 +79,22 @@ func CreateBankNameMapping(key, name string) error {
 		return errors.New("存储地址未配置")
 	}
 
-	if err := ioutil.WriteFile(
-		fmt.Sprintf("%s/%s", config.DataDir, bankNameCnFileName),
-		[]byte(strings.Join([]string{key, name}, "=")), os.ModeAppend); err != nil {
-		logger.Error(err.Error())
-		return errors.New("创建银行名称映射关系失败")
+	filepath := fmt.Sprintf("%s/%s", config.DataDir, bankNameCnFileName)
+	var (
+		file *os.File
+		err  error
+	)
+
+	if file, err = os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err != nil {
+		return err
+	}
+
+	defer func() {
+		file.Close()
+	}()
+
+	if _, err = file.WriteString(strings.Join([]string{key, name}, "=")); err != nil {
+		return err
 	}
 	bankNameCnMapping.dataMap[key] = name
 	return nil
@@ -99,11 +108,23 @@ func CreateCountryCnNameMapping(key, name string) error {
 		return errors.New("存储地址未配置")
 	}
 
-	if err := ioutil.WriteFile(
-		fmt.Sprintf("%s/%s", config.DataDir, bankNameCnFileName),
-		[]byte(strings.Join([]string{key, name}, "=")), os.ModeAppend); err != nil {
-		logger.Error(err.Error())
-		return errors.New("创建国家名称映射关系失败")
+	filepath := fmt.Sprintf("%s/%s", config.DataDir, bankNameCnFileName)
+
+	var (
+		file *os.File
+		err  error
+	)
+
+	if file, err = os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err != nil {
+		return err
+	}
+
+	defer func() {
+		file.Close()
+	}()
+
+	if _, err = file.WriteString(strings.Join([]string{key, name}, "=")); err != nil {
+		return err
 	}
 	countryCnMapping.dataMap[key] = name
 	return nil
@@ -195,7 +216,7 @@ func readMappingFile(mpf mappingFile, e file.FileEvent) {
 		return
 	}
 	if !e.FileCreated {
-		if _, err := f.Seek(mpf.bytes, 0); err != nil {
+		if _, err := f.Seek(0, io.SeekEnd); err != nil {
 			logger.Errorf("seek file %s error: %s", err)
 			return
 		}
@@ -211,10 +232,6 @@ func readMappingFile(mpf mappingFile, e file.FileEvent) {
 			continue
 		}
 		mpf.dataMap[kv[0]] = kv[1]
-	}
-
-	if fileInfo, err := f.Stat(); err == nil {
-		mpf.bytes += fileInfo.Size()
 	}
 }
 
