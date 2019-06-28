@@ -19,4 +19,6 @@ const (
 	ResponseCodeMissingParams = 1003
 	//非法参数
 	ResponseCodeInvalidParams = 1004
+	//数据不存在
+	ResponseCodeNotFound = 1010
 )

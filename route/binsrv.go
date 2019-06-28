@@ -13,7 +13,7 @@ func binQuery(ctx *gin.Context) {
 		err     error
 	)
 	if binData, err = bdata.Query(ctx.Param("bin")); err != nil {
-		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: "失败"})
+		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeNotFound, Msg: "数据不存在"})
 		return
 	}
 	ctx.JSON(http.StatusOK, mod.ResponseData{ResponseValue: mod.ResponseValue{Code: mod.ResponseCodeSuccess, Msg: "成功 "}, Data: binData})

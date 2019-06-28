@@ -27,8 +27,8 @@ var (
 var (
 	config                 = BinDataConfig{}
 	currentBinDatabase     BinDatabase
-	bankNameCnMapping      = mappingFile{bytes: 0, reloading: make(chan file.FileEvent), handler: refreshBankName, dataMap: make(map[string]string, 3000)}
-	countryCnMapping       = mappingFile{bytes: 0, reloading: make(chan file.FileEvent), handler: refreshCountry, dataMap: make(map[string]string, 300)}
+	bankNameCnMapping      = mappingFile{bytes: 0, reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 3000)}
+	countryCnMapping       = mappingFile{bytes: 0, reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 300)}
 	NullBinData            mod.BinData
 	setBinDatabaseModeOnce sync.Once
 )
@@ -44,7 +44,6 @@ type BinDataConfig struct {
 type mappingFile struct {
 	bytes     int64
 	reloading chan file.FileEvent
-	handler   func(file.FileEvent)
 	dataMap   map[string]string
 }
 
@@ -65,7 +64,7 @@ func SetBinDatabaseMode(mode string) {
 			currentBinDatabase = NewMemoryDatabase()
 		}
 		if err := currentBinDatabase.Init(config); err != nil {
-			logger.Fatal("refresh bin data error: %s", err.Error())
+			logger.Fatal("refresh bin data error: %s", err)
 		}
 	})
 }
@@ -84,7 +83,7 @@ func CreateBankNameMapping(key, name string) error {
 
 	if err := ioutil.WriteFile(
 		fmt.Sprintf("%s/%s", config.DataDir, bankNameCnFileName),
-		[]byte(strings.Join([]string{key, name}, "=")), 0644); err != nil {
+		[]byte(strings.Join([]string{key, name}, "=")), os.ModeAppend); err != nil {
 		logger.Error(err.Error())
 		return errors.New("创建银行名称映射关系失败")
 	}
@@ -102,7 +101,7 @@ func CreateCountryCnNameMapping(key, name string) error {
 
 	if err := ioutil.WriteFile(
 		fmt.Sprintf("%s/%s", config.DataDir, bankNameCnFileName),
-		[]byte(strings.Join([]string{key, name}, "=")), 0644); err != nil {
+		[]byte(strings.Join([]string{key, name}, "=")), os.ModeAppend); err != nil {
 		logger.Error(err.Error())
 		return errors.New("创建国家名称映射关系失败")
 	}
@@ -173,7 +172,7 @@ func readFromFile(event file.FileEvent) {
 	} else if filename == countryCnFileName {
 		countryCnMapping.reloading <- event
 	} else {
-		logger.Infof("忽略文件: %s\n", filepath)
+		logger.Infof("忽略文件: %s", filepath)
 	}
 }
 
@@ -192,12 +191,12 @@ func readMappingFile(mpf mappingFile, e file.FileEvent) {
 	)
 	filepath := e.Filepath
 	if f, err = os.Open(filepath); err != nil {
-		logger.Errorf("read file error: %s\n", err.Error())
+		logger.Errorf("read file error: %s", err)
 		return
 	}
 	if !e.FileCreated {
 		if _, err := f.Seek(mpf.bytes, 0); err != nil {
-			logger.Errorf("seek file %s error: %s\n", err.Error())
+			logger.Errorf("seek file %s error: %s", err)
 			return
 		}
 	}
@@ -225,7 +224,7 @@ func WatchBinDataDir(dir string) {
 			if v, ok := err.(error); ok {
 				logger.Errorf("panic: %s\n", v.Error())
 			}
-			logger.Errorf("watching bin data directory error: %s\n", string(debug.Stack()))
+			logger.Errorf("watching bin data directory error: %s", string(debug.Stack()))
 		}
 	}()
 	config.DataDir = path.Dir(dir)
@@ -240,15 +239,15 @@ func registerFileHander() {
 			if v, ok := err.(error); ok {
 				logger.Errorf("panic: %s\n", v.Error())
 			}
-			logger.Errorf("file handler error: %s\n", string(debug.Stack()))
+			logger.Errorf("file handler error: %s", string(debug.Stack()))
 		}
 	}()
 	for {
 		select {
 		case event := <-bankNameCnMapping.reloading:
-			bankNameCnMapping.handler(event)
+			refreshBankName(event)
 		case event := <-countryCnMapping.reloading:
-			countryCnMapping.handler(event)
+			refreshCountry(event)
 		}
 	}
 }
@@ -262,7 +261,7 @@ func prepare(dir string) {
 		filename := path.Base(filepath)
 		return bankNameCnFileName == filename || countryCnFileName == filename
 	}); err != nil {
-		logger.Fatal("prepare data failed, error: %s", err.Error())
+		logger.Errorf("prepare data failed, error: %s", err)
 	}
 
 	for _, filepath := range filepaths {
@@ -294,14 +293,14 @@ func beginWatching(dir string) {
 				}
 
 				if event.Op&fsnotify.Write == fsnotify.Write {
-					logger.Infof("file modified %s:\n", event.Name)
+					logger.Infof("file modified %s:", event.Name)
 					e := file.FileEvent{Filepath: event.Name, FileCreated: false}
 					readFromFile(e)
 					for _, l := range fileEventListenerList {
 						l(e)
 					}
 				} else if event.Op&fsnotify.Create == fsnotify.Create {
-					logger.Infof("file created %s:\n", event.Name)
+					logger.Infof("file created %s:", event.Name)
 					e := file.FileEvent{Filepath: event.Name, FileCreated: true}
 					readFromFile(e)
 					for _, l := range fileEventListenerList {
@@ -312,7 +311,7 @@ func beginWatching(dir string) {
 				if !ok {
 					return
 				}
-				logger.Error("watch %s error:%s\n", dir, err.Error())
+				logger.Error("watch %s error:%s", dir, err)
 			}
 		}
 	}()

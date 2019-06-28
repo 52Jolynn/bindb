@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,13 +28,12 @@ var (
 	binDataApproximateFileName = fmt.Sprintf("approximate%s", binDataApproximateFileExt)
 	binDataFileName            = fmt.Sprintf("bindata%s", binDataFileExt)
 	binDataHeader              = "id,iin_start,iin_end,number_length,number_luhn,scheme,brand,type,prepaid,country,bank_name,bank_logo,bank_url,bank_phone,bank_city"
-	binDataMappingFile         = binDataFileHandler{bytesMap: make(map[string]int64), reloading: make(chan file.FileEvent), handler: refreshBinData}
+	binDataMappingFile         = binDataFileHandler{bytesMap: make(map[string]int64), reloading: make(chan file.FileEvent)}
 )
 
 type binDataFileHandler struct {
 	bytesMap  map[string]int64
 	reloading chan file.FileEvent
-	handler   func(file.FileEvent)
 }
 
 type memoryDatabase struct {
@@ -54,23 +54,21 @@ func (m *memoryDatabase) Init(cfg BinDataConfig) error {
 		filepaths []string
 		err       error
 	)
-	initFailure := errors.New("初始化内存数据库失败")
 	if filepaths, err = file.SearchDir(cfg.DataDir, func(filepath string) bool {
 		ext := path.Ext(filepath)
 		return binDataFileExt == ext || binDataApproximateFileExt == ext
 	}); err != nil {
-		logger.Errorf("memory database init failed, error: %s", err.Error())
-		return initFailure
+		logger.Errorf("memory database init failed, error: %s, dataDir: %s", err, cfg.DataDir)
 	}
 
 	var (
 		filedata []string
 		filesize int64
 	)
-
+	initFailure := errors.New("初始化内存数据库失败")
 	for _, filepath := range filepaths {
 		if filedata, filesize, err = read(filepath, 0); err != nil {
-			logger.Errorf("读取文件失败, error: %s", err)
+			logger.Errorf("读取文件失败, error: %s, filepath: %s", err, filepath)
 			return initFailure
 		}
 
@@ -82,7 +80,7 @@ func (m *memoryDatabase) Init(cfg BinDataConfig) error {
 		for _, value := range filedata {
 			var data []mod.BinData
 			if data, err = parse(value); err != nil {
-				logger.Errorf("parse bin data error: %s, data: %s", err.Error(), value)
+				logger.Errorf("parse bin data error: %s, data: %s", err, value)
 			}
 			for _, d := range data {
 				m.save2Memory(d.IinStart, d, approximate)
@@ -96,8 +94,28 @@ func (m *memoryDatabase) Init(cfg BinDataConfig) error {
 	}
 
 	memory.dataDir = cfg.DataDir
-	AddFileListener(refreshBinData)
+	go registerBinDataRefresher()
+	AddFileListener(func(event file.FileEvent) {
+		binDataMappingFile.reloading <- event
+	})
 	return nil
+}
+
+func registerBinDataRefresher() {
+	defer func() {
+		if err := recover(); err != nil {
+			if v, ok := err.(error); ok {
+				logger.Errorf("panic: %s\n", v.Error())
+			}
+			logger.Errorf("refresh bin data file error: %s", string(debug.Stack()))
+		}
+	}()
+	for {
+		select {
+		case event := <-binDataMappingFile.reloading:
+			refreshBinData(event)
+		}
+	}
 }
 
 func (m *memoryDatabase) ReadExact(bin uint32) (mod.BinData, error) {
@@ -168,7 +186,7 @@ func refreshBinData(e file.FileEvent) {
 		err      error
 	)
 	if filedata, filesize, err = read(filepath, seekOffset); err != nil {
-		logger.Errorf("read bin data error: %s", err.Error())
+		logger.Errorf("read bin data error: %s", err)
 		return
 	}
 
@@ -181,7 +199,7 @@ func refreshBinData(e file.FileEvent) {
 	for _, fd := range filedata {
 		var binDataSet []mod.BinData
 		if binDataSet, err = parse(fd); err != nil {
-			logger.Errorf("parse bin binDataSet error: %s, binDataSet: %s", err.Error(), fd)
+			logger.Errorf("parse bin binDataSet error: %s, binDataSet: %s", err, fd)
 			continue
 		}
 		for _, d := range binDataSet {
@@ -221,7 +239,7 @@ func write2File(bin uint32, filepath string, bindata mod.BinData) error {
 		bindata.BankPhone,
 		bindata.BankCity}, ","))
 
-	if err := ioutil.WriteFile(filepath, data.Bytes(), 0644); err != nil {
+	if err := ioutil.WriteFile(filepath, data.Bytes(), os.ModeAppend); err != nil {
 		logger.Error(err.Error())
 		return errors.New("保存bindata失败")
 	}
