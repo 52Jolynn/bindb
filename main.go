@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"git.thinkinpower.net/bindb/data"
+	"git.thinkinpower.net/bindb/bdata"
 	"git.thinkinpower.net/bindb/middleware"
 	"git.thinkinpower.net/bindb/route"
 	"github.com/gin-gonic/gin"
@@ -18,11 +18,11 @@ import (
 
 func setMode(mode string) {
 	switch mode {
-	case data.RunModeDev:
+	case bdata.RunModeDev:
 		gin.SetMode(gin.DebugMode)
-	case data.RunModeTest:
+	case bdata.RunModeTest:
 		gin.SetMode(gin.TestMode)
-	case data.RunModeRelease:
+	case bdata.RunModeRelease:
 		gin.SetMode(gin.ReleaseMode)
 	}
 }
@@ -38,8 +38,9 @@ func main() {
 	flag.Parse()
 
 	if *dataDir != "" {
-		go func() { data.WatchBinDataDir(*dataDir) }()
+		go func() { bdata.WatchBinDataDir(*dataDir) }()
 	}
+	bdata.SetBinDatabaseMode(bdata.BinDatabaseModeMemory)
 
 	//启动http服务
 	logger.Info("启动http服务...")

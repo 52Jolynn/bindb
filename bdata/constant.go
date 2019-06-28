@@ -1,4 +1,4 @@
-package data
+package bdata
 
 const (
 	DatePattern            = "2006-01-02"
@@ -9,4 +9,7 @@ const (
 	RunModeDev     = "dev"
 	RunModeTest    = "test"
 	RunModeRelease = "release"
+
+	BinDatabaseModeMemory = "memory"
+	BinDatabaseModeRedis  = "redis"
 )

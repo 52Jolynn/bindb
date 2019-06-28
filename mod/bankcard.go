@@ -1,9 +1,10 @@
 package mod
 
 type BinData struct {
+	Id           int64     `json:"id"`
 	IinStart     uint32    `json:"iin_start"`
 	IinEnd       uint32    `json:"iin_end"`
-	NumberLength uint8     `json:"number_length"`
+	NumberLength int8      `json:"number_length"`
 	NumberLuhn   string    `json:"number_luhn"`
 	Prepaid      string    `json:"prepaid"`
 	Status       BinStatus `json:"status"`

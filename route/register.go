@@ -1,7 +1,7 @@
 package route
 
 import (
-	"git.thinkinpower.net/bindb/data"
+	"git.thinkinpower.net/bindb/bdata"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"
@@ -11,7 +11,7 @@ func Register(r *gin.Engine) {
 	g := r.Group("/bindb")
 	{
 		g.GET("/index", func(context *gin.Context) {
-			context.String(http.StatusOK, "Hello bindb, date: %s", time.Now().Format(data.DateTimePattern))
+			context.String(http.StatusOK, "Hello bindb, date: %s", time.Now().Format(bdata.DateTimePattern))
 		})
 
 		v1 := g.Group("/v1")

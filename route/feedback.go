@@ -1,7 +1,7 @@
 package route
 
 import (
-	"git.thinkinpower.net/bindb/data"
+	"git.thinkinpower.net/bindb/bdata"
 	"git.thinkinpower.net/bindb/mod"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -18,7 +18,7 @@ func feedback(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeInvalidParams, Msg: "非法参数"})
 		return
 	}
-	if err := data.CreateBinData(ctx.Param("bin"), bindata, true); err != nil {
+	if err := bdata.CreateBinData(ctx.Param("bin"), bindata, true); err != nil {
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: err.Error()})
 		return
 	}
@@ -36,7 +36,7 @@ func feedback_t(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeInvalidParams, Msg: "非法参数"})
 		return
 	}
-	if err := data.CreateBinData(ctx.Param("bin"), bindata, false); err != nil {
+	if err := bdata.CreateBinData(ctx.Param("bin"), bindata, false); err != nil {
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: err.Error()})
 		return
 	}
@@ -52,7 +52,7 @@ func verifyBinData(binData mod.BinData) bool {
 
 //新增银行中文名称对应关系
 func addBankNameCn(ctx *gin.Context) {
-	if err := data.CreateBankNameMapping(ctx.Param("key"), ctx.Param("name")); err != nil {
+	if err := bdata.CreateBankNameMapping(ctx.Param("key"), ctx.Param("name")); err != nil {
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: err.Error()})
 		return
 	}
@@ -61,7 +61,7 @@ func addBankNameCn(ctx *gin.Context) {
 
 //新增国家中文名称对应关系
 func addCountryCn(ctx *gin.Context) {
-	if err := data.CreateCountryCnNameMapping(ctx.Param("key"), ctx.Param("name")); err != nil {
+	if err := bdata.CreateCountryCnNameMapping(ctx.Param("key"), ctx.Param("name")); err != nil {
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: err.Error()})
 		return
 	}
