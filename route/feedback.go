@@ -4,6 +4,7 @@ import (
 	"git.thinkinpower.net/bindb/bdata"
 	"git.thinkinpower.net/bindb/mod"
 	"github.com/gin-gonic/gin"
+	logger "github.com/sirupsen/logrus"
 	"net/http"
 )
 
@@ -11,6 +12,7 @@ import (
 func feedback(ctx *gin.Context) {
 	var bindata mod.BinData
 	if err := ctx.BindJSON(&bindata); err != nil {
+		logger.Error(err)
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: "无法解析request body"})
 	}
 	//判断入参是否合法
@@ -19,6 +21,7 @@ func feedback(ctx *gin.Context) {
 		return
 	}
 	if err := bdata.CreateBinData(ctx.Param("bin"), bindata, true); err != nil {
+		logger.Error(err)
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: err.Error()})
 		return
 	}
@@ -29,6 +32,7 @@ func feedback(ctx *gin.Context) {
 func feedback_t(ctx *gin.Context) {
 	var bindata mod.BinData
 	if err := ctx.BindJSON(&bindata); err != nil {
+		logger.Error(err)
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: "无法解析request body"})
 	}
 	//判断入参是否合法
@@ -37,6 +41,7 @@ func feedback_t(ctx *gin.Context) {
 		return
 	}
 	if err := bdata.CreateBinData(ctx.Param("bin"), bindata, false); err != nil {
+		logger.Error(err)
 		ctx.JSON(http.StatusOK, mod.ResponseValue{Code: mod.ResponseCodeFailure, Msg: err.Error()})
 		return
 	}

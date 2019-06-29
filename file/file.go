@@ -3,6 +3,7 @@ package file
 import (
 	"io/ioutil"
 	"os"
+	"path"
 )
 
 type FileEvent struct {
@@ -22,13 +23,13 @@ func SearchDir(dir string, filter func(filepath string) bool) ([]string, error) 
 		for _, fileInfo := range fileInfos {
 			if fileInfo.IsDir() {
 				var filepaths []string
-				if filepaths, err = SearchDir(fileInfo.Name(), filter); err != nil {
+				if filepaths, err = SearchDir(path.Join(dir, fileInfo.Name()), filter); err != nil {
 					return nil, err
 				}
 				result = append(result, filepaths...)
 			} else {
-				if !filter(fileInfo.Name()) {
-					result = append(result, fileInfo.Name())
+				if filter(fileInfo.Name()) {
+					result = append(result, path.Join(dir, fileInfo.Name()))
 				}
 			}
 		}

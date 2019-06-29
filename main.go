@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func setMode(mode string) {
+func setGinMode(mode string) {
 	switch mode {
 	case bdata.RunModeDev:
 		gin.SetMode(gin.DebugMode)
@@ -34,17 +34,18 @@ func main() {
 
 	port := flag.Int("p", 8080, "-p 8080")
 	mode := flag.String("m", "dev", "-m [dev|test|release]")
-	dataDir := flag.String("d", "./test", "-d /home/testuser/bindata")
+	dataDir := flag.String("d", ".", "-d /home/testuser/bindata")
 	flag.Parse()
 
 	if *dataDir != "" {
 		go func() { bdata.WatchBinDataDir(*dataDir) }()
 	}
+	bdata.Config.DataDir = *dataDir
 	bdata.SetBinDatabaseMode(bdata.BinDatabaseModeMemory)
 
 	//启动http服务
 	logger.Info("启动http服务...")
-	setMode(*mode)
+	setGinMode(*mode)
 	r := gin.New()
 	r.Use(middleware.Log())
 	r.Use(middleware.Recovery())

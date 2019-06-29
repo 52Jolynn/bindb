@@ -95,7 +95,10 @@ func (m *memoryDatabase) Init(cfg BinDataConfig) error {
 	memory.dataDir = cfg.DataDir
 	go registerBinDataRefresher()
 	AddFileListener(func(event file.FileEvent) {
-		binDataMappingFile.reloading <- event
+		ext := path.Ext(event.Filepath)
+		if binDataFileExt == ext || binDataApproximateFileExt == ext {
+			binDataMappingFile.reloading <- event
+		}
 	})
 	return nil
 }
@@ -136,6 +139,9 @@ func (m *memoryDatabase) ReadApproximate(bin uint32) ([]mod.BinData, error) {
 }
 
 func (m *memoryDatabase) Save(bin uint32, bindata mod.BinData, approximate bool) error {
+	if _, ok := m.dataMap[bin]; ok && approximate {
+		return nil
+	}
 	m.save2Memory(bin, bindata, approximate)
 	if m.dataDir == "" {
 		return errors.New("存储地址未配置")
@@ -212,7 +218,7 @@ func write2File(bin uint32, filepath string, bindata mod.BinData) error {
 	data := bytes.Buffer{}
 	if _, err := os.Stat(filepath); err != nil && os.IsNotExist(err) {
 		//文件不存在, 需要写入header
-		data.Write([]byte(binDataHeader))
+		data.Write([]byte(fmt.Sprintf("%s\n", binDataHeader)))
 	}
 	//写入数据
 	iinEnd := ""
@@ -223,12 +229,15 @@ func write2File(bin uint32, filepath string, bindata mod.BinData) error {
 	if bindata.NumberLength == 0 {
 		numLen = strconv.FormatUint(uint64(bindata.NumberLength), 10)
 	}
+
 	data.WriteString(strings.Join([]string{
+		fmt.Sprintf("%d", bindata.Id),
 		strconv.FormatUint(uint64(bin), 10),
 		iinEnd,
 		numLen,
 		bindata.NumberLuhn,
 		bindata.Schema,
+		bindata.Brand,
 		bindata.CardType,
 		bindata.Prepaid,
 		bindata.Country,
@@ -243,6 +252,15 @@ func write2File(bin uint32, filepath string, bindata mod.BinData) error {
 		err  error
 	)
 
+	dir := path.Dir(filepath)
+	if _, err := os.Stat(dir); err != nil && os.IsNotExist(err) {
+		//目录不存在
+		if err = os.MkdirAll(dir, 0744); err != nil {
+			return err
+		}
+		addWatchDir(dir)
+	}
+
 	if file, err = os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err != nil {
 		return err
 	}
@@ -251,7 +269,7 @@ func write2File(bin uint32, filepath string, bindata mod.BinData) error {
 		file.Close()
 	}()
 
-	if _, err = file.WriteString(data.String()); err != nil {
+	if _, err = file.WriteString(fmt.Sprintf("%s\n", data.String())); err != nil {
 		logger.Error(err.Error())
 		return errors.New("保存bindata失败")
 	}

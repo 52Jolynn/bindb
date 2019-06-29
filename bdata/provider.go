@@ -24,10 +24,10 @@ var (
 )
 
 var (
-	config                 = BinDataConfig{}
+	Config                 = BinDataConfig{}
 	currentBinDatabase     BinDatabase
-	bankNameCnMapping      = mappingFile{reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 3000)}
-	countryCnMapping       = mappingFile{reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 300)}
+	bankNameCnMapping      = mappingFile{fileSize: 0, reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 3000)}
+	countryCnMapping       = mappingFile{fileSize: 0, reloading: make(chan file.FileEvent), dataMap: make(map[string]string, 300)}
 	NullBinData            mod.BinData
 	setBinDatabaseModeOnce sync.Once
 )
@@ -41,6 +41,7 @@ type BinDataConfig struct {
 }
 
 type mappingFile struct {
+	fileSize  int64
 	reloading chan file.FileEvent
 	dataMap   map[string]string
 }
@@ -61,7 +62,7 @@ func SetBinDatabaseMode(mode string) {
 		} else {
 			currentBinDatabase = NewMemoryDatabase()
 		}
-		if err := currentBinDatabase.Init(config); err != nil {
+		if err := currentBinDatabase.Init(Config); err != nil {
 			logger.Fatal("refresh bin data error: %s", err)
 		}
 	})
@@ -75,11 +76,11 @@ func CreateBankNameMapping(key, name string) error {
 	if _, ok := bankNameCnMapping.dataMap[key]; ok {
 		return nil
 	}
-	if config.DataDir == "" {
+	if Config.DataDir == "" {
 		return errors.New("存储地址未配置")
 	}
 
-	filepath := fmt.Sprintf("%s/%s", config.DataDir, bankNameCnFileName)
+	filepath := fmt.Sprintf("%s/%s", Config.DataDir, bankNameCnFileName)
 	var (
 		file *os.File
 		err  error
@@ -93,9 +94,17 @@ func CreateBankNameMapping(key, name string) error {
 		file.Close()
 	}()
 
-	if _, err = file.WriteString(strings.Join([]string{key, name}, "=")); err != nil {
+	if _, err = file.WriteString(fmt.Sprintf("%s\n", strings.Join([]string{key, name}, "="))); err != nil {
 		return err
 	}
+
+	var (
+		fileInfo os.FileInfo
+	)
+	if fileInfo, err = file.Stat(); err != nil {
+		return err
+	}
+	bankNameCnMapping.fileSize = fileInfo.Size()
 	bankNameCnMapping.dataMap[key] = name
 	return nil
 }
@@ -104,11 +113,11 @@ func CreateCountryCnNameMapping(key, name string) error {
 	if _, ok := countryCnMapping.dataMap[key]; ok {
 		return nil
 	}
-	if config.DataDir == "" {
+	if Config.DataDir == "" {
 		return errors.New("存储地址未配置")
 	}
 
-	filepath := fmt.Sprintf("%s/%s", config.DataDir, bankNameCnFileName)
+	filepath := fmt.Sprintf("%s/%s", Config.DataDir, countryCnFileName)
 
 	var (
 		file *os.File
@@ -123,9 +132,16 @@ func CreateCountryCnNameMapping(key, name string) error {
 		file.Close()
 	}()
 
-	if _, err = file.WriteString(strings.Join([]string{key, name}, "=")); err != nil {
+	if _, err = file.WriteString(fmt.Sprintf("%s\n", strings.Join([]string{key, name}, "="))); err != nil {
 		return err
 	}
+	var (
+		fileInfo os.FileInfo
+	)
+	if fileInfo, err = file.Stat(); err != nil {
+		return err
+	}
+	countryCnMapping.fileSize = fileInfo.Size()
 	countryCnMapping.dataMap[key] = name
 	return nil
 }
@@ -198,25 +214,35 @@ func readFromFile(event file.FileEvent) {
 }
 
 func refreshBankName(event file.FileEvent) {
-	readMappingFile(bankNameCnMapping, event)
+	readMappingFile(&bankNameCnMapping, event)
 }
 
 func refreshCountry(event file.FileEvent) {
-	readMappingFile(countryCnMapping, event)
+	readMappingFile(&countryCnMapping, event)
 }
 
-func readMappingFile(mpf mappingFile, e file.FileEvent) {
+func readMappingFile(mpf *mappingFile, e file.FileEvent) {
 	var (
-		f   *os.File
-		err error
+		f        *os.File
+		fileInfo os.FileInfo
+		err      error
 	)
 	filepath := e.Filepath
 	if f, err = os.Open(filepath); err != nil {
 		logger.Errorf("read file error: %s", err)
 		return
 	}
-	if !e.FileCreated {
-		if _, err := f.Seek(0, io.SeekEnd); err != nil {
+	if fileInfo, err = f.Stat(); err != nil {
+		logger.Error(err)
+		return
+	}
+
+	if fileInfo.Size() < mpf.fileSize {
+		//文件有删除, 全部重新加载
+		mpf.dataMap = make(map[string]string, len(mpf.dataMap))
+		mpf.fileSize = 0
+	} else if !e.FileCreated {
+		if _, err := f.Seek(mpf.fileSize, io.SeekStart); err != nil {
 			logger.Errorf("seek file %s error: %s", err)
 			return
 		}
@@ -233,6 +259,7 @@ func readMappingFile(mpf mappingFile, e file.FileEvent) {
 		}
 		mpf.dataMap[kv[0]] = kv[1]
 	}
+	mpf.fileSize += fileInfo.Size()
 }
 
 func WatchBinDataDir(dir string) {
@@ -244,7 +271,6 @@ func WatchBinDataDir(dir string) {
 			logger.Errorf("watching bin data directory error: %s", string(debug.Stack()))
 		}
 	}()
-	config.DataDir = path.Dir(dir)
 	go registerFileHander()
 	prepare(dir)
 	beginWatching(dir)
@@ -286,11 +312,17 @@ func prepare(dir string) {
 	}
 }
 
+var watcher *fsnotify.Watcher
+
+func addWatchDir(dir string) error {
+	if err := watcher.Add(dir); err != nil {
+		return err
+	}
+	return nil
+}
+
 func beginWatching(dir string) {
-	var (
-		watcher *fsnotify.Watcher
-		err     error
-	)
+	var err error
 	if watcher, err = fsnotify.NewWatcher(); err != nil {
 		logger.Error(err)
 	}
@@ -333,7 +365,7 @@ func beginWatching(dir string) {
 		}
 	}()
 
-	if err = watcher.Add(dir); err != nil {
+	if err = addWatchDir(dir); err != nil {
 		logger.Error(err)
 	}
 	<-done
