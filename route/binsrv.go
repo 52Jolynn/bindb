@@ -1,8 +1,8 @@
 package route
 
 import (
-	"git.thinkinpower.net/bindb/bdata"
-	"git.thinkinpower.net/bindb/mod"
+	"kidshelloworld.com/bindb/bdata"
+	"kidshelloworld.com/bindb/mod"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )

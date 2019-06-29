@@ -1,4 +1,4 @@
-module git.thinkinpower.net/bindb
+module kidshelloworld.com/bindb
 
 require (
 	github.com/fsnotify/fsnotify v1.4.7

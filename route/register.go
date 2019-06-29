@@ -1,7 +1,7 @@
 package route
 
 import (
-	"git.thinkinpower.net/bindb/bdata"
+	"kidshelloworld.com/bindb/bdata"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"

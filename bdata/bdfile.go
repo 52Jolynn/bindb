@@ -2,7 +2,7 @@ package bdata
 
 import (
 	"bufio"
-	"git.thinkinpower.net/bindb/mod"
+	"kidshelloworld.com/bindb/mod"
 	"io"
 	"os"
 	"strconv"
